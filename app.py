@@ -1,34 +1,49 @@
 import streamlit as st
 import vertexai
 from vertexai.preview import reasoning_engines
-import google.auth
+import google.oauth2.service_account
 import google.auth.transport.requests
 import requests
 import json
 import tempfile
 import os
 
-# Load credentials from Streamlit secrets or local environment
-def get_credentials():
-    try:
-        # Running on Streamlit Cloud - use secrets
-        credentials_info = json.loads(st.secrets["gcp_service_account"]["CREDENTIALS"])
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            json.dump(credentials_info, f)
-            temp_path = f.name
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = temp_path
-    except Exception:
-        # Running locally - use existing credentials
-        pass
-
-get_credentials()
-
 PROJECT_ID = "book-recommender-488914"
 LOCATION = "us-central1"
 RESOURCE_NAME = "projects/118366759310/locations/us-central1/reasoningEngines/5429717171934593024"
 
-vertexai.init(project=PROJECT_ID, location=LOCATION)
-agent = reasoning_engines.ReasoningEngine(RESOURCE_NAME)
+def get_token():
+    try:
+        credentials_info = json.loads(st.secrets["gcp_service_account"]["CREDENTIALS"])
+        scopes = ["https://www.googleapis.com/auth/cloud-platform"]
+        creds = google.oauth2.service_account.Credentials.from_service_account_info(
+            credentials_info,
+            scopes=scopes
+        )
+        auth_req = google.auth.transport.requests.Request()
+        creds.refresh(auth_req)
+        return creds.token
+    except Exception as e:
+        # Local development
+        import google.auth
+        creds, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+        auth_req = google.auth.transport.requests.Request()
+        creds.refresh(auth_req)
+        return creds.token
+
+def init_agent():
+    try:
+        credentials_info = json.loads(st.secrets["gcp_service_account"]["CREDENTIALS"])
+        creds = google.oauth2.service_account.Credentials.from_service_account_info(
+            credentials_info,
+            scopes=["https://www.googleapis.com/auth/cloud-platform"]
+        )
+        vertexai.init(project=PROJECT_ID, location=LOCATION, credentials=creds)
+    except Exception:
+        vertexai.init(project=PROJECT_ID, location=LOCATION)
+    return reasoning_engines.ReasoningEngine(RESOURCE_NAME)
+
+agent = init_agent()
 
 st.title("📚 Book Recommender")
 st.write("Tell me your mood or interests and I'll recommend the perfect book for you!")
@@ -53,13 +68,10 @@ if user_input:
 
     with st.chat_message("assistant"):
         try:
-            creds, project = google.auth.default()
-            auth_req = google.auth.transport.requests.Request()
-            creds.refresh(auth_req)
-
+            token = get_token()
             url = f"https://us-central1-aiplatform.googleapis.com/v1/{RESOURCE_NAME}:streamQuery"
             headers = {
-                "Authorization": f"Bearer {creds.token}",
+                "Authorization": f"Bearer {token}",
                 "Content-Type": "application/json"
             }
             payload = {
