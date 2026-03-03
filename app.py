@@ -4,6 +4,24 @@ from vertexai.preview import reasoning_engines
 import google.auth
 import google.auth.transport.requests
 import requests
+import json
+import tempfile
+import os
+
+# Load credentials from Streamlit secrets or local environment
+def get_credentials():
+    try:
+        # Running on Streamlit Cloud - use secrets
+        credentials_info = json.loads(st.secrets["gcp_service_account"]["CREDENTIALS"])
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            json.dump(credentials_info, f)
+            temp_path = f.name
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = temp_path
+    except Exception:
+        # Running locally - use existing credentials
+        pass
+
+get_credentials()
 
 PROJECT_ID = "book-recommender-488914"
 LOCATION = "us-central1"
@@ -55,7 +73,6 @@ if user_input:
             response = requests.post(url, headers=headers, json=payload)
             data = response.json()
 
-            # Extract text from content -> parts -> text
             response_text = ""
             if isinstance(data, list):
                 for item in data:
