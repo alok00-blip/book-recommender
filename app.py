@@ -4,7 +4,6 @@ from vertexai.preview import reasoning_engines
 import google.oauth2.service_account
 import google.auth.transport.requests
 import requests
-import json
 
 PROJECT_ID = "book-recommender-488914"
 LOCATION = "us-central1"
@@ -62,16 +61,15 @@ if user_input:
             data = response.json()
 
             response_text = ""
-            if isinstance(data, list):
-                for item in data:
-                    if isinstance(item, dict) and "content" in item:
-                        for part in item["content"].get("parts", []):
-                            if "text" in part:
-                                response_text += part["text"]
+            items = data if isinstance(data, list) else [data]
+            for item in items:
+                if isinstance(item, dict) and "content" in item:
+                    for part in item["content"].get("parts", []):
+                        if "text" in part:
+                            response_text += part["text"]
 
             if not response_text:
-                # Show raw response for debugging
-                response_text = f"Raw response: {str(data)[:500]}"
+                response_text = "Sorry I could not get a response. Please try again."
 
         except Exception as e:
             response_text = f"Error: {str(e)}"
