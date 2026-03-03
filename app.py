@@ -5,45 +5,29 @@ import google.oauth2.service_account
 import google.auth.transport.requests
 import requests
 import json
-import tempfile
-import os
 
 PROJECT_ID = "book-recommender-488914"
 LOCATION = "us-central1"
 RESOURCE_NAME = "projects/118366759310/locations/us-central1/reasoningEngines/5429717171934593024"
+SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
 
-def get_token():
-    try:
-        credentials_info = json.loads(st.secrets["gcp_service_account"]["CREDENTIALS"])
-        scopes = ["https://www.googleapis.com/auth/cloud-platform"]
-        creds = google.oauth2.service_account.Credentials.from_service_account_info(
-            credentials_info,
-            scopes=scopes
+def get_credentials():
+    creds_dict = dict(st.secrets["gcp_service_account"])
+    # Remove the CREDENTIALS wrapper if present
+    if "CREDENTIALS" in creds_dict:
+        return google.oauth2.service_account.Credentials.from_service_account_info(
+            json.loads(creds_dict["CREDENTIALS"]),
+            scopes=SCOPES
         )
-        auth_req = google.auth.transport.requests.Request()
-        creds.refresh(auth_req)
-        return creds.token
-    except Exception as e:
-        # Local development
-        import google.auth
-        creds, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
-        auth_req = google.auth.transport.requests.Request()
-        creds.refresh(auth_req)
-        return creds.token
-
-def init_agent():
-    try:
-        credentials_info = json.loads(st.secrets["gcp_service_account"]["CREDENTIALS"])
-        creds = google.oauth2.service_account.Credentials.from_service_account_info(
-            credentials_info,
-            scopes=["https://www.googleapis.com/auth/cloud-platform"]
+    else:
+        return google.oauth2.service_account.Credentials.from_service_account_info(
+            creds_dict,
+            scopes=SCOPES
         )
-        vertexai.init(project=PROJECT_ID, location=LOCATION, credentials=creds)
-    except Exception:
-        vertexai.init(project=PROJECT_ID, location=LOCATION)
-    return reasoning_engines.ReasoningEngine(RESOURCE_NAME)
 
-agent = init_agent()
+creds = get_credentials()
+vertexai.init(project=PROJECT_ID, location=LOCATION, credentials=creds)
+agent = reasoning_engines.ReasoningEngine(RESOURCE_NAME)
 
 st.title("📚 Book Recommender")
 st.write("Tell me your mood or interests and I'll recommend the perfect book for you!")
@@ -68,42 +52,8 @@ if user_input:
 
     with st.chat_message("assistant"):
         try:
-            token = get_token()
+            auth_req = google.auth.transport.requests.Request()
+            creds.refresh(auth_req)
+
             url = f"https://us-central1-aiplatform.googleapis.com/v1/{RESOURCE_NAME}:streamQuery"
-            headers = {
-                "Authorization": f"Bearer {token}",
-                "Content-Type": "application/json"
-            }
-            payload = {
-                "class_method": "stream_query",
-                "input": {
-                    "user_id": "streamlit-user",
-                    "session_id": st.session_state.session_id,
-                    "message": user_input
-                }
-            }
-            response = requests.post(url, headers=headers, json=payload)
-            data = response.json()
-
-            response_text = ""
-            if isinstance(data, list):
-                for item in data:
-                    if isinstance(item, dict) and "content" in item:
-                        parts = item["content"].get("parts", [])
-                        for part in parts:
-                            if "text" in part:
-                                response_text += part["text"]
-            elif isinstance(data, dict) and "content" in data:
-                parts = data["content"].get("parts", [])
-                for part in parts:
-                    if "text" in part:
-                        response_text += part["text"]
-
-            if not response_text:
-                response_text = "Sorry I could not get a response. Please try again."
-
-        except Exception as e:
-            response_text = f"Error: {str(e)}"
-
-        st.write(response_text)
-        st.session_state.messages.append({"role": "assistant", "content": response_text})
+            headers =
