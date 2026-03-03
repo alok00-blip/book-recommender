@@ -12,7 +12,7 @@ RESOURCE_NAME = "projects/118366759310/locations/us-central1/reasoningEngines/54
 SCOPES = ["https://www.googleapis.com/auth/cloud-platform"]
 
 creds = google.oauth2.service_account.Credentials.from_service_account_info(
-    dict(st.secrets["gcp_service_account"]),
+    dict(st.secrets),
     scopes=SCOPES
 )
 
@@ -71,3 +71,4 @@ if user_input:
             response_text = f"Error: {str(e)}"
         st.write(response_text)
         st.session_state.messages.append({"role": "assistant", "content": response_text})
+
